@@ -1,6 +1,5 @@
 import dotenv from "dotenv";
 dotenv.config();
-console.log("dotenv loaded:", dotenv.config());
 console.log("MONGODB_URI:", process.env.MONGODB_URI); // Debug statement
 
 import express from "express";
@@ -35,9 +34,14 @@ const fetchAllQuestions = async () => {
   const allQuestions = [];
   const db = mongoose.connection.db;
 
+  console.log("Fetching data from collections...");
+
   for (const collectionName of collections) {
     const collection = db.collection(collectionName);
     const questions = await collection.find({}).toArray();
+
+    console.log(`Fetched ${questions.length} questions from ${collectionName}`);
+
     allQuestions.push(...questions);
   }
 
