@@ -28,6 +28,7 @@ const collections = [
   "questions_part4",
   "questions_part5",
   "questions_part6",
+  "test"
 ];
 
 const fetchAllQuestions = async () => {
