@@ -23,10 +23,11 @@ const collections = [
 
 const fetchAllQuestions = async () => {
   const allQuestions = [];
+  const db = mongoose.connection.db;
 
   for (const collectionName of collections) {
-    const collection = mongoose.connection.collection(collectionName);
-    const questions = await collection.find().toArray();
+    const collection = db.collection(collectionName);
+    const questions = await collection.find({}).toArray();
     allQuestions.push(...questions);
   }
 
