@@ -28,14 +28,13 @@ const collections = [
   "questions_part4",
   "questions_part5",
   "questions_part6",
-  "test"
 ];
 
 const fetchAllQuestions = async () => {
   const allQuestions = [];
   const db = mongoose.connection.db;
 
-  console.log("Fetching data from collections...");
+  console.log("Fetching data from the entire database...");
 
   for (const collectionName of collections) {
     const collection = db.collection(collectionName);
