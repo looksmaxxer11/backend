@@ -21,31 +21,17 @@ mongoose
     console.log("MongoDB connection error:", error.message);
   });
 
-const collections = [
-  "questions_part1",
-  "questions_part2",
-  "questions_part3",
-  "questions_part4",
-  "questions_part5",
-  "questions_part6",
-];
-
 const fetchAllQuestions = async () => {
-  const allQuestions = [];
   const db = mongoose.connection.db;
+  const collection = db.collection("questions_part1"); // Fetch from a single collection for testing
 
-  console.log("Fetching data from the entire database...");
+  console.log("Fetching data from questions_part1...");
 
-  for (const collectionName of collections) {
-    const collection = db.collection(collectionName);
-    const questions = await collection.find({}).toArray();
+  const questions = await collection.find({}).toArray();
 
-    console.log(`Fetched ${questions.length} questions from ${collectionName}`);
+  console.log(`Fetched ${questions.length} questions from questions_part1`);
 
-    allQuestions.push(...questions);
-  }
-
-  return allQuestions;
+  return questions;
 };
 
 // Get a random question
