@@ -2,37 +2,17 @@ import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
 import jwt from "jsonwebtoken";
-import dotenv from "dotenv";
 import Question from "../models/Question.js";
 import User from "../models/User.js";
 import Result from "../models/Results.js";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
-import path from "path";
 
+const router = express.Router();
 
-// Get the directory path of the current module
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-// Load environment variables from the correct path
-dotenv.config({ path: join(__dirname, "..", ".env") });
-
-const app = express();
-const PORT = process.env.PORT || 5001;
-
-// Debug logs for environment variables
-console.log("🔧 Configuration:");
-console.log(`- PORT: ${PORT}`);
-console.log(`- MongoDB URI: ${process.env.MONGODB_URI?.substring(0, 20)}...`);
-console.log(`- JWT Secret exists: ${!!process.env.JWT_SECRET}`);
-
-// Middleware
-app.use(cors({
+router.use(cors({
   origin: ['http://localhost:3000', 'http://localhost:3001'], // Add your frontend URLs
   credentials: true
 }));
-app.use(express.json());
+router.use(express.json());
 
 // Define authenticateToken middleware first
 const authenticateToken = (req, res, next) => {
@@ -56,7 +36,7 @@ const authenticateToken = (req, res, next) => {
 };
 
 // Add this before your routes
-app.use(authenticateToken, async (req, res, next) => {
+router.use(authenticateToken, async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id);
     if (user && user.currentQuiz) {
@@ -90,27 +70,27 @@ const QUESTIONS_PER_PART = Math.ceil(50 / COLLECTIONS.length);
 
 // MongoDB Connection with debug logging
 console.log("📡 Connecting to MongoDB...");
-mongoose
-  .connect(process.env.MONGODB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-    serverSelectionTimeoutMS: 10000, // 10 second timeout
-    heartbeatFrequencyMS: 2000, // More frequent heartbeats
-  })
-  .then(() => {
-    console.log("✅ Connected to MongoDB successfully");
-  })
-  .catch((err) => {
-    console.error("❌ MongoDB connection error:", err);
-    if (err.name === "MongoNetworkError") {
-      console.error("Network error details:", {
-        code: err.code,
-        syscall: err.syscall,
-        hostname: err.hostname,
-      });
-    }
-    process.exit(1);
-  });
+// mongoose
+//   .connect(process.env.MONGODB_URI, {
+//     useNewUrlParser: true,
+//     useUnifiedTopology: true,
+//     serverSelectionTimeoutMS: 10000, // 10 second timeout
+//     heartbeatFrequencyMS: 2000, // More frequent heartbeats
+//   })
+//   .then(() => {
+//     console.log("✅ Connected to MongoDB successfully");
+//   })
+//   .catch((err) => {
+//     console.error("❌ MongoDB connection error:", err);
+//     if (err.name === "MongoNetworkError") {
+//       console.error("Network error details:", {
+//         code: err.code,
+//         syscall: err.syscall,
+//         hostname: err.hostname,
+//       });
+//     }
+//     process.exit(1);
+//   });
 
 // Monitor MongoDB connection
 mongoose.connection.on("error", (err) => {
@@ -126,7 +106,7 @@ mongoose.connection.on("reconnected", () => {
 });
 
 // Health check endpoint
-app.get("/api/health", (req, res) => {
+router.get("/api/health", (req, res) => {
   const dbStatus =
     mongoose.connection.readyState === 1 ? "connected" : "disconnected";
   res.json({
@@ -137,7 +117,7 @@ app.get("/api/health", (req, res) => {
 });
 
 // Simplified questions endpoint
-app.get('/api/questions', authenticateToken, async (req, res) => {
+router.get('/api/questions', authenticateToken, async (req, res) => {
   try {
     const questions = await Question.aggregate([{ $sample: { size: 50 } }]); // Fetch 50 random questions
 
@@ -159,7 +139,7 @@ app.get('/api/questions', authenticateToken, async (req, res) => {
   }
 });
 
-app.get("/api/results", authenticateToken, async (req, res) => {
+router.get("/api/results", authenticateToken, async (req, res) => {
   const page = parseInt(req.query.page) || 1; // Get page number from query, default to 1
   const limit = parseInt(req.query.limit) || 10; // Get limit from query, default to 10
   const skip = (page - 1) * limit; // Calculate how many results to skip
@@ -183,7 +163,7 @@ app.get("/api/results", authenticateToken, async (req, res) => {
   }
 });
 
-app.post("/api/quiz/save-state", authenticateToken, async (req, res) => {
+router.post("/api/quiz/save-state", authenticateToken, async (req, res) => {
   try {
     console.log("Saving state for user:", req.user.id);
     console.log("Received state data:", req.body);
@@ -242,7 +222,7 @@ app.post("/api/quiz/save-state", authenticateToken, async (req, res) => {
 //   // Add more questions as needed
 // ];
 // Results endpoint
-app.post("/api/results", authenticateToken, async (req, res) => {
+router.post("/api/results", authenticateToken, async (req, res) => {
   try {
     console.log("Saving results for user:", req.user.id);
     console.log("Raw request body:", req.body); // Log the raw request body
@@ -307,13 +287,13 @@ app.post("/api/results", authenticateToken, async (req, res) => {
     res.status(500).json({
       error: "Failed to save results",
       details: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      // stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
 
 // Get specific quiz result
-app.get("/api/results/:id", authenticateToken, async (req, res) => {
+router.get("/api/results/:id", authenticateToken, async (req, res) => {
   try {
     const result = await Result.findOne({
       _id: req.params.id,
@@ -332,7 +312,7 @@ app.get("/api/results/:id", authenticateToken, async (req, res) => {
 });
 
 // Modify the sync endpoint to prevent question changes
-app.post("/api/quiz/sync", authenticateToken, async (req, res) => {
+router.post("/api/quiz/sync", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const { currentQuestionIndex, userAnswers } = req.body;
@@ -379,7 +359,7 @@ app.post("/api/quiz/sync", authenticateToken, async (req, res) => {
 });
 
 // Get current quiz state
-app.get("/api/quiz/current", authenticateToken, async (req, res) => {
+router.get("/api/quiz/current", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const user = await User.findById(userId);
@@ -423,7 +403,7 @@ app.get("/api/quiz/current", authenticateToken, async (req, res) => {
 });
 
 // Get quiz state endpoint
-app.get("/api/quiz/state", authenticateToken, async (req, res) => {
+router.get("/api/quiz/state", authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
     if (!user || !user.currentQuiz) {
@@ -444,7 +424,7 @@ app.get("/api/quiz/state", authenticateToken, async (req, res) => {
 });
 
 // Clear quiz state endpoint
-app.delete("/api/quiz/state", authenticateToken, async (req, res) => {
+router.delete("/api/quiz/state", authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
     if (user) {
@@ -459,7 +439,7 @@ app.delete("/api/quiz/state", authenticateToken, async (req, res) => {
 });
 
 // Add this middleware to clear quiz state on logout
-app.post("/api/logout", authenticateToken, async (req, res) => {
+router.post("/api/logout", authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
     if (user) {
@@ -474,7 +454,7 @@ app.post("/api/logout", authenticateToken, async (req, res) => {
 });
 
 // Start quiz endpoint
-app.post("/api/quiz/start", authenticateToken, async (req, res) => {
+router.post("/api/quiz/start", authenticateToken, async (req, res) => {
   try {
     console.log("Starting quiz for user:", req.user.id);
     
@@ -542,13 +522,13 @@ app.post("/api/quiz/start", authenticateToken, async (req, res) => {
     res.status(500).json({ 
       error: "Failed to start quiz",
       details: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      // stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
 
 // Save quiz state endpoint
-app.post("/api/quiz/save-state", authenticateToken, async (req, res) => {
+router.post("/api/quiz/save-state", authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
     if (!user || !user.currentQuiz) {
@@ -579,7 +559,7 @@ function getPartFromCollectionName(objectId) {
 }
 
 // Update quiz state endpoint
-app.post("/api/quiz/update-state", authenticateToken, async (req, res) => {
+router.post("/api/quiz/update-state", authenticateToken, async (req, res) => {
   try {
     const { currentQuestionIndex, userAnswers, remainingTime } = req.body;
     
@@ -609,11 +589,12 @@ app.post("/api/quiz/update-state", authenticateToken, async (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log("📝 API endpoints:");
-  console.log("- GET  /api/health");
-  console.log("- POST /api/quiz/start");
-  console.log("- POST /api/quiz/update-state");
-  console.log("- POST /api/results");
-});
+// router.listen(PORT, () => {
+//   console.log(`🚀 Server (Index.mjs) running on http://localhost:${PORT}`);
+//   console.log("📝 API endpoints:");
+//   console.log("- GET  /api/health");
+//   console.log("- POST /api/quiz/start");
+//   console.log("- POST /api/quiz/update-state");
+//   console.log("- POST /api/results");
+// });
+export default router;

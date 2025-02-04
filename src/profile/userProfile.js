@@ -1,10 +1,10 @@
-import dotenv from "dotenv";
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
 import { ProfileModel } from "../../models/ProfileModel.js";
 
-dotenv.config({ path: "../../.env" });
+
+const router = express.Router();
 const MONGODB_URI = process.env.MONGODB_URI;
 
 if (!MONGODB_URI) {
@@ -13,30 +13,28 @@ if (!MONGODB_URI) {
   );
   process.exit(1);
 }
-const app = express();
-const PORT = process.env.PORT || 5002;
 
-app.use(cors());
-app.use(express.json());
+router.use(cors());
+router.use(express.json());
 
 const USERS_DB_URI = MONGODB_URI.replace(/\/[^\/]+$/, "/law-quiz");
 
-mongoose
-  .connect(USERS_DB_URI)
-  .then(() => console.log("✅ Connected to the users database"))
-  .catch((err) => console.error("❌ MongoDB connection error:", err));
+// mongoose
+//   .connect(USERS_DB_URI)
+//   .then(() => console.log("✅ Connected to the users database"))
+//   .catch((err) => console.error("❌ MongoDB connection error:", err));
 
 const ObjectId = mongoose.Types.ObjectId;
 
-app.get("/api/user/:id", async (req, res) => {
+router.get("/api/user/:id", async (req, res) => {
   try {
-    const userId = req.params.id; 
+    const userId = req.params.id;
 
     if (!ObjectId.isValid(userId)) {
       return res.status(400).json({ message: "Invalid user ID format" });
     }
 
-    const user = await ProfileModel.findById( new ObjectId(userId));
+    const user = await ProfileModel.findById(new ObjectId(userId));
 
     if (!user) {
       return res.status(404).json({ message: "User not found!" });
@@ -51,7 +49,7 @@ app.get("/api/user/:id", async (req, res) => {
 
 
 // Add this to your backend file
-app.put("/api/user/:id", async (req, res) => {
+router.put("/api/user/:id", async (req, res) => {
   try {
     const userId = req.params.id;
     const updateData = req.body;
@@ -80,7 +78,7 @@ app.put("/api/user/:id", async (req, res) => {
 
 
 
-app.post("/api/user/change-email", async (req, res) => {
+router.post("/api/user/change-email", async (req, res) => {
   try {
     const { userId, currentPassword, newEmail } = req.body;
 
@@ -126,6 +124,4 @@ app.post("/api/user/change-email", async (req, res) => {
 
 
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server 2 running on port ${PORT}`);
-});
+export default router;

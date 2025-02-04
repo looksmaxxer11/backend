@@ -1,26 +1,15 @@
 import express from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import mongoose from "mongoose";
 import cors from "cors";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
 import User from "../../models/User.js";
-import dotenv from "dotenv";
 
-dotenv.config({ path: "../../.env" });
-console.log("MONGODB_URI:", process.env.MONGODB_URI);
+const router = express.Router();
 
-const app = express();
-const PORT = process.env.PORT || 5000;
-
-app.use(cors());
-app.use(express.json());
-
-mongoose
-  .connect(process.env.MONGODB_URI)
-  .then(() => console.log("Connected to MongoDB Atlas"))
-  .catch((error) => console.error("MongoDB connection error:", error));
+router.use(cors());
+router.use(express.json());
 
 const sendEmail = async (to, subject, text) => {
    const transporter = nodemailer.createTransport({
@@ -29,8 +18,8 @@ const sendEmail = async (to, subject, text) => {
      port: 587,
      secure: false,
      auth: {
-       user: process.env.EMAIL_USER, // Your app's service email
-       pass: process.env.EMAIL_PASS,
+       user: process.env.EMAIL_USER, // This will be defined in your .env file
+       pass: process.env.EMAIL_PASS,  // This will be defined in your .env file
      },
    });
 
@@ -44,7 +33,7 @@ const sendEmail = async (to, subject, text) => {
   await transporter.sendMail(mailOptions);
 };
 
-app.post("/signup", async (req, res) => {
+router.post("/signup", async (req, res) => {
   const { name, surname, email, password } = req.body;
 
   try {
@@ -77,7 +66,7 @@ app.post("/signup", async (req, res) => {
   }
 });
 
-app.post("/resetpassword", async (req, res) => {
+router.post("/resetpassword", async (req, res) => {
   const { email } = req.body;
   console.log("Received reset password request for email:", email);
 
@@ -120,7 +109,7 @@ app.post("/resetpassword", async (req, res) => {
   }
 });
 
-app.post("/resetpassword/confirm", async (req, res) => {
+router.post("/resetpassword/confirm", async (req, res) => {
   const { token, newPassword } = req.body;
 
   try {
@@ -165,12 +154,12 @@ const authenticateToken = (req, res, next) => {
   }
 };
 
-app.post("/login", async (req, res) => {
+router.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
   try {
     const existingUser = await User.findOne({ email })
-      .select('+password') // Explicitly include password
+      .select("+password") // Explicitly include password
       .lean(); // Convert to plain JavaScript object
 
     if (!existingUser) {
@@ -184,40 +173,42 @@ app.post("/login", async (req, res) => {
 
     // Clear any existing quiz state
     await User.findByIdAndUpdate(existingUser._id, {
-      $set: { currentQuiz: null }
+      $set: { currentQuiz: null },
     });
 
     const token = jwt.sign(
-      { 
+      {
         id: existingUser._id,
-        email: existingUser.email 
-      }, 
+        email: existingUser.email,
+      },
       process.env.JWT_SECRET,
       { expiresIn: "24h" }
     );
 
-    return res.status(200).json({ 
-      message: "Login successful!", 
+    return res.status(200).json({
+      message: "Login successful!",
       token,
       user: {
         id: existingUser._id,
         name: existingUser.name,
-        email: existingUser.email
-      }
+        email: existingUser.email,
+      },
     });
   } catch (error) {
     console.error("Login error:", error);
-    res.status(500).json({ message: "Something went wrong. Please try again." });
+    res
+      .status(500)
+      .json({ message: "Something went wrong. Please try again." });
   }
 });
 
-app.post("/logout", authenticateToken, async (req, res) => {
+router.post("/logout", authenticateToken, async (req, res) => {
   try {
     // Clear the current quiz state
     await User.findByIdAndUpdate(req.user.id, {
-      $set: { currentQuiz: null }
+      $set: { currentQuiz: null },
     });
-    
+
     res.status(200).json({ message: "Logged out successfully" });
   } catch (error) {
     console.error("Logout error:", error);
@@ -226,11 +217,11 @@ app.post("/logout", authenticateToken, async (req, res) => {
 });
 
 // PROFILE ID
-app.get("/api/user/:id", async (req, res) => {
+router.get("/api/user/:id", async (req, res) => {
   try {
     console.log("Connecting to MongoDB...");
 
-    const user = await User.findById("677d4004cb97e9204d67b525");
+    const user = await User.findById(req.params.id); // Use req.params.id to fetch the user
     console.log("User fetched:", user);
 
     if (!user) {
@@ -246,6 +237,4 @@ app.get("/api/user/:id", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server 1 running on port ${PORT}`);
-});
+export default router;
