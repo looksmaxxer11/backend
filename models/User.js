@@ -9,6 +9,7 @@ const userSchema = new mongoose.Schema(
     password: { type: String, required: true },
     resetToken: String,
     resetTokenExpiry: Date,
+    refreshToken: { type: String, default: null }, // Add this line to store the refresh token
     // Add user quiz preferences and history
     quizPreferences: {
       difficulty: { type: String, enum: ['easy', 'medium', 'hard'], default: 'medium' },

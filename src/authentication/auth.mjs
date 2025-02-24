@@ -55,11 +55,20 @@ router.post("/signup", async (req, res) => {
 
     await newUser.save();
 
-    const token = jwt.sign({ id: newUser._id }, process.env.JWT_SECRET, {
+    // Generate access and refresh tokens
+    const accessToken = jwt.sign({ id: newUser._id, email: newUser.email }, process.env.JWT_SECRET, {
+      expiresIn: "1d",
+    });
+
+    const refreshToken = jwt.sign({ id: newUser._id, email: newUser.email }, process.env.JWT_REFRESH_SECRET, {
       expiresIn: "7d",
     });
 
-    res.status(201).json({ message: "User registered successfully!", token });
+    // Store refresh token in the database
+    newUser.refreshToken = refreshToken;
+    await newUser.save();
+
+    res.status(201).json({ message: "User registered successfully!", accessToken, refreshToken });
   } catch (error) {
     console.error("Signup error:", error);
     res.status(500).json({ message: "Something went wrong" });
@@ -119,19 +128,19 @@ router.post("/resetpassword/confirm", async (req, res) => {
     });
 
     if (!user) {
-      console.log("Invalid token or token expired"); // Debug log
+      console.log("Invalid token or token expired");
       return res.status(400).send("Invalid token or token expired.");
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     user.password = hashedPassword;
-    user.resetToken = undefined;
-    user.resetTokenExpiry = undefined;
+    user.resetToken = undefined; // Clear the reset token
+    user.resetTokenExpiry = undefined; // Clear the expiration
     await user.save();
 
     res.status(200).send("Password has been reset successfully.");
   } catch (error) {
-    console.error("Error resetting password:", error); // Detailed error log
+    console.error("Error resetting password:", error);
     res.status(500).send("Failed to reset password. Please try again.");
   }
 });
@@ -139,6 +148,8 @@ router.post("/resetpassword/confirm", async (req, res) => {
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1];
+
+  console.log("Received token:", token); // Log the received token
 
   if (!token) {
     return res.status(401).json({ error: "Authentication token required" });
@@ -154,16 +165,60 @@ const authenticateToken = (req, res, next) => {
   }
 };
 
+
+router.post("/logout", authenticateToken, async (req, res) => {
+  try {
+    await User.findByIdAndUpdate(req.user.id, {
+      $set: { refreshToken: null },
+    });
+    res.status(200).json({ message: "Logged out successfully" });
+  } catch (error) {
+    console.error("Logout error:", error);
+    res.status(500).json({ message: "Failed to logout" });
+  }
+});
+router.post("/refresh-token", async (req, res) => {
+  const { refreshToken } = req.body;
+
+  if (!refreshToken) {
+    return res.status(401).json({ message: "Refresh token is required" });
+  }
+
+  try {
+    // Find the user by refresh token
+    const user = await User.findOne({ refreshToken });
+
+    if (!user) {
+      return res.status(403).json({ message: "Invalid refresh token" });
+    }
+
+    // Verify the refresh token
+    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+
+    // Generate a new access token
+    const newAccessToken = jwt.sign(
+      { id: decoded.id, email: decoded.email },
+      process.env.JWT_SECRET,
+      { expiresIn: "10s" }
+    );
+
+    res.status(200).json({ accessToken: newAccessToken });
+  } catch (error) {
+    console.error("Refresh token error:", error);
+    res.status(403).json({ message: "Invalid or expired refresh token" });
+  }
+});
+
+
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
   try {
     const existingUser = await User.findOne({ email })
-      .select("+password") // Explicitly include password
-      .lean(); // Convert to plain JavaScript object
+      .select("+password"); // Remove .lean() to keep Mongoose document methods
 
     if (!existingUser) {
-      return res.status(400).json({ message: "User not found!" });
+      return res.status(401).json({ message: "Invalid email or password!" });
     }
 
     const isMatch = await bcrypt.compare(password, existingUser.password);
@@ -176,18 +231,27 @@ router.post("/login", async (req, res) => {
       $set: { currentQuiz: null },
     });
 
-    const token = jwt.sign(
-      {
-        id: existingUser._id,
-        email: existingUser.email,
-      },
+    // Generate access and refresh tokens
+    const accessToken = jwt.sign(
+      { id: existingUser._id, email: existingUser.email },
       process.env.JWT_SECRET,
-      { expiresIn: "24h" }
+      { expiresIn: "1d" }
     );
+
+    const refreshToken = jwt.sign(
+      { id: existingUser._id, email: existingUser.email },
+      process.env.JWT_REFRESH_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    // Store refresh token in the database
+    existingUser.refreshToken = refreshToken;
+    await existingUser.save(); // Now this will work
 
     return res.status(200).json({
       message: "Login successful!",
-      token,
+      accessToken,
+      refreshToken,
       user: {
         id: existingUser._id,
         name: existingUser.name,
@@ -196,25 +260,10 @@ router.post("/login", async (req, res) => {
     });
   } catch (error) {
     console.error("Login error:", error);
-    res
-      .status(500)
-      .json({ message: "Something went wrong. Please try again." });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 });
 
-router.post("/logout", authenticateToken, async (req, res) => {
-  try {
-    // Clear the current quiz state
-    await User.findByIdAndUpdate(req.user.id, {
-      $set: { currentQuiz: null },
-    });
-
-    res.status(200).json({ message: "Logged out successfully" });
-  } catch (error) {
-    console.error("Logout error:", error);
-    res.status(500).json({ message: "Failed to logout" });
-  }
-});
 
 // PROFILE ID
 router.get("/api/user/:id", async (req, res) => {

@@ -14,7 +14,7 @@ if (!MONGODB_URI) {
   process.exit(1);
 }
 
-router.use(cors());
+  router.use(cors());
 router.use(express.json());
 
 const USERS_DB_URI = MONGODB_URI.replace(/\/[^\/]+$/, "/law-quiz");

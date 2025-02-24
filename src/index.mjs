@@ -8,10 +8,7 @@ import Result from "../models/Results.js";
 
 const router = express.Router();
 
-router.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001'], // Add your frontend URLs
-  credentials: true
-}));
+router.use(cors());
 router.use(express.json());
 
 // Define authenticateToken middleware first
@@ -31,7 +28,7 @@ const authenticateToken = (req, res, next) => {
     next();
   } catch (error) {
     console.error("Token verification failed:", error);
-    return res.status(403).json({ error: "Invalid token" });
+    return res.status(403).json({ error: "Invalid Token" });
   }
 };
 
@@ -588,13 +585,4 @@ router.post("/api/quiz/update-state", authenticateToken, async (req, res) => {
   }
 });
 
-// Start server
-// router.listen(PORT, () => {
-//   console.log(`🚀 Server (Index.mjs) running on http://localhost:${PORT}`);
-//   console.log("📝 API endpoints:");
-//   console.log("- GET  /api/health");
-//   console.log("- POST /api/quiz/start");
-//   console.log("- POST /api/quiz/update-state");
-//   console.log("- POST /api/results");
-// });
 export default router;
